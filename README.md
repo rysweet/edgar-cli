@@ -1,6 +1,12 @@
 # Edgar - Claude Code-Compatible CLI for Agentic Coding
 
+[![GitHub Repository](https://img.shields.io/badge/GitHub-edgar--cli-blue)](https://github.com/rysweet/edgar-cli)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Node.js Version](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen)](https://nodejs.org)
+
 Edgar is a fully functional reimplementation of Claude Code, built using Test-Driven Development (TDD) principles. It provides an AI-powered coding assistant that can help with various software engineering tasks through a command-line interface.
+
+**Repository**: [https://github.com/rysweet/edgar-cli](https://github.com/rysweet/edgar-cli)
 
 ## ✅ Project Status: COMPLETE
 
