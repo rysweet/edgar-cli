@@ -1,0 +1,64 @@
+{
+  "name": "@edgar/cli",
+  "version": "0.1.0",
+  "description": "Edgar - A Claude Code-compatible CLI for agentic coding",
+  "main": "dist/index.js",
+  "bin": {
+    "edgar": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "nodemon --watch src --exec ts-node src/index.ts",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "lint": "eslint src --ext .ts",
+    "format": "prettier --write \"src/**/*.ts\" \"tests/**/*.ts\"",
+    "clean": "rm -rf dist coverage",
+    "prepublish": "npm run build"
+  },
+  "keywords": [
+    "cli",
+    "ai",
+    "coding",
+    "assistant",
+    "agent"
+  ],
+  "author": "",
+  "license": "MIT",
+  "type": "commonjs",
+  "devDependencies": {
+    "@types/fs-extra": "^11.0.4",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^24.5.2",
+    "@typescript-eslint/eslint-plugin": "^8.44.0",
+    "@typescript-eslint/parser": "^8.44.0",
+    "eslint": "^9.36.0",
+    "jest": "^30.1.3",
+    "nodemon": "^3.1.10",
+    "prettier": "^3.6.2",
+    "ts-jest": "^29.4.4",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.2"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.63.0",
+    "@azure/openai": "^2.0.0",
+    "@types/cheerio": "^0.22.35",
+    "axios": "^1.12.2",
+    "chalk": "^5.6.2",
+    "cheerio": "^1.1.2",
+    "commander": "^14.0.1",
+    "dotenv": "^17.2.2",
+    "execa": "^9.6.0",
+    "fs-extra": "^11.3.2",
+    "glob": "^11.0.3",
+    "inquirer": "^12.9.6",
+    "js-yaml": "^4.1.0",
+    "minimatch": "^10.0.3",
+    "openai": "^5.22.0",
+    "ora": "^9.0.0",
+    "source-map-support": "^0.5.21",
+    "yaml": "^2.8.1"
+  }
+}

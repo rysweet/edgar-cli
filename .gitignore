@@ -1,0 +1,45 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+*.js.map
+
+# Testing
+coverage/
+*.log
+
+# Environment files - NEVER COMMIT THESE
+.env
+.env.local
+.edgar.env
+*.env
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+test-*.js
+test-*.sh
+test-edgar*
+
+# Session data
+.edgar/sessions/
+.claude/sessions/
+todos.json
+
+# Local configuration
+.edgar/settings.local.json
+.claude/settings.local.json
+.edgar/
+.claude/

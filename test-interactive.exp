@@ -1,0 +1,18 @@
+#!/usr/bin/expect -f
+
+# Test Edgar interactive mode
+set timeout 10
+
+spawn edgar chat --provider azure
+
+expect "Edgar initialized successfully"
+
+# Test a simple query
+send "What is 2 + 2?\r"
+expect "4"
+
+# Test exit
+send "exit\r"
+expect "Goodbye"
+
+puts "\nInteractive test completed successfully!"

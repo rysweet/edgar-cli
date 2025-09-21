@@ -1,0 +1,39 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "commonjs",
+    "lib": ["ES2022"],
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "moduleResolution": "node",
+    "types": ["node", "jest"],
+    "baseUrl": "./src",
+    "paths": {
+      "@/*": ["*"],
+      "@core/*": ["core/*"],
+      "@cli/*": ["cli/*"],
+      "@tools/*": ["tools/*"],
+      "@config/*": ["config/*"],
+      "@hooks/*": ["hooks/*"],
+      "@subagents/*": ["subagents/*"],
+      "@output/*": ["output/*"],
+      "@mcp/*": ["mcp/*"],
+      "@llm/*": ["llm/*"],
+      "@tests/*": ["../tests/*"]
+    }
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist"]
+}
