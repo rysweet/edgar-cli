@@ -1,10 +1,11 @@
-# Edgar - Claude Code-Compatible CLI for Agentic Coding
+# Edgar - 100% Claude Code Compatible CLI
 
 [![GitHub Repository](https://img.shields.io/badge/GitHub-edgar--cli-blue)](https://github.com/rysweet/edgar-cli)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node.js Version](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen)](https://nodejs.org)
+[![Claude Code Compatible](https://img.shields.io/badge/Claude%20Code-Compatible-purple)](https://claude.ai/code)
 
-Edgar is a fully functional reimplementation of Claude Code, built using Test-Driven Development (TDD) principles. It provides an AI-powered coding assistant that can help with various software engineering tasks through a command-line interface.
+Edgar is a fully Claude Code-compatible CLI implementation, built using Test-Driven Development (TDD) principles. It provides the exact same CLI interface, tool definitions, SDK parameters, hooks, and slash commands as Claude Code, making it a drop-in replacement.
 
 **Repository**: [https://github.com/rysweet/edgar-cli](https://github.com/rysweet/edgar-cli)
 
@@ -27,13 +28,13 @@ Run Edgar directly from GitHub using npx:
 
 ```bash
 # Run Edgar directly without installing
-npx github:rysweet/edgar-cli --help
+npx github:rysweet/edgar-cli
+
+# Execute a single prompt
+npx github:rysweet/edgar-cli -p "What is 2+2?"
 
 # Or use the full GitHub URL
-npx git+https://github.com/rysweet/edgar-cli.git --help
-
-# Start an interactive chat session
-npx github:rysweet/edgar-cli chat
+npx git+https://github.com/rysweet/edgar-cli.git
 ```
 
 ### Local Installation
@@ -120,23 +121,27 @@ LLM_TEMPERATURE=0.7
 LLM_MAX_TOKENS=4096
 ```
 
-## Usage
+## Usage (Claude Code Compatible)
 
-### Interactive Chat Mode (Default)
+### Interactive Mode (Default)
 ```bash
+# Start interactive session
 edgar
-# or
-edgar chat
 ```
 
-### Execute a Task
+### Single Prompt Execution
 ```bash
-edgar task "refactor this function to use async/await"
+# Execute a single prompt with -p or --prompt
+edgar -p "What is 2+2?"
+edgar --prompt "Write a hello world function in Python"
 ```
 
-### Ask a Question
+### Command-Line Options
 ```bash
-edgar query "What is the time complexity of quicksort?"
+edgar -h, --help     # Show help
+edgar -v, --version  # Show version
+edgar -d, --debug    # Enable debug mode
+edgar --no-color     # Disable colored output
 ```
 
 ### With Environment Variables

@@ -37,7 +37,6 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.LLMProviderFactory = exports.OutputStyleManager = exports.SubagentManager = exports.BaseTool = exports.ToolManager = exports.SessionManager = exports.MasterLoop = exports.ConfigManager = exports.EdgarCLI = void 0;
 const commander_1 = require("commander");
 const fs = __importStar(require("fs-extra"));
 const path = __importStar(require("path"));
@@ -52,6 +51,13 @@ const subagent_manager_1 = require("./subagents/subagent-manager");
 const output_style_manager_1 = require("./output/output-style-manager");
 const config_manager_1 = require("./config/config-manager");
 const path_utils_1 = require("./config/path-utils");
+// Check if we're in prompt mode to suppress dotenv output
+const isPromptMode = process.argv.some(arg => arg === '-p' || arg === '--prompt');
+// Suppress console output during prompt mode
+const originalConsoleLog = console.log;
+if (isPromptMode) {
+    console.log = () => { }; // Temporarily disable console.log
+}
 // Load environment variables
 const configDirs = (0, path_utils_1.getConfigDir)();
 const envPath = path.join(configDirs.projectPath, '.env');
@@ -63,40 +69,75 @@ const edgarEnvPath = path.join(configDirs.userPath, '.edgar.env');
 if (fs.existsSync(edgarEnvPath)) {
     dotenv.config({ path: edgarEnvPath });
 }
+// Restore console.log after dotenv loads
+if (isPromptMode) {
+    console.log = originalConsoleLog;
+}
 const program = new commander_1.Command();
 const version = '0.1.0';
-program
-    .name('edgar')
-    .description('Edgar - A Claude Code-compatible CLI for agentic coding')
-    .version(version);
-// Interactive mode (default)
-program
-    .command('chat', { isDefault: true })
-    .description('Start an interactive chat session')
-    .option('-s, --style <style>', 'Set output style (concise, detailed, socratic, technical, tutorial)')
-    .option('-p, --provider <provider>', 'Set LLM provider (anthropic, openai, azure)')
-    .action(async (options) => {
-    console.log(chalk_1.default.cyan(`\n🤖 Edgar v${version} - AI Coding Assistant`));
-    console.log(chalk_1.default.gray('Type "exit" to quit, "help" for commands\n'));
-    // Initialize components
+// Helper to initialize components
+async function initializeEdgar() {
+    (0, path_utils_1.ensureDirectoryStructure)();
+    const configManager = new config_manager_1.ConfigManager();
+    const toolManager = new tool_manager_1.ToolManager();
+    const outputStyleManager = new output_style_manager_1.OutputStyleManager();
+    const llmProvider = llm_provider_factory_1.LLMProviderFactory.create(); // Use env var, not CLI flag
+    const subagentManager = new subagent_manager_1.SubagentManager(toolManager, llmProvider);
+    const masterLoop = new master_loop_v2_1.MasterLoop(llmProvider, toolManager, undefined, // HookManager
+    outputStyleManager);
+    return { masterLoop, outputStyleManager, configManager };
+}
+// Show help for slash commands
+function showHelp() {
+    console.log(chalk_1.default.cyan('\n📚 Available Commands:'));
+    console.log(chalk_1.default.gray('  /help         - Show this help message'));
+    console.log(chalk_1.default.gray('  /clear        - Clear the conversation'));
+    console.log(chalk_1.default.gray('  /save         - Save conversation to file'));
+    console.log(chalk_1.default.gray('  /load <file>  - Load conversation from file'));
+    console.log(chalk_1.default.gray('  /style <name> - Change output style'));
+    console.log(chalk_1.default.gray('  /config       - Show configuration'));
+    console.log(chalk_1.default.gray('  exit          - Exit Edgar\n'));
+}
+// Handle slash commands
+async function handleCommand(input, masterLoop, outputStyleManager) {
+    const parts = input.split(' ');
+    const command = parts[0].toLowerCase();
+    switch (command) {
+        case '/help':
+            showHelp();
+            break;
+        case '/clear':
+            console.log(chalk_1.default.yellow('Conversation cleared.'));
+            // TODO: Implement conversation clearing
+            break;
+        case '/style':
+            if (parts[1]) {
+                outputStyleManager.setActiveStyle(parts[1]);
+                console.log(chalk_1.default.green(`Output style changed to: ${parts[1]}`));
+            }
+            else {
+                console.log(chalk_1.default.red('Please specify a style name.'));
+            }
+            break;
+        case '/config':
+            console.log(chalk_1.default.cyan('Current Configuration:'));
+            console.log('  Provider:', process.env.LLM_PROVIDER || 'anthropic');
+            console.log('  Temperature:', process.env.LLM_TEMPERATURE || '0.7');
+            console.log('  Max Tokens:', process.env.LLM_MAX_TOKENS || '4096');
+            break;
+        default:
+            console.log(chalk_1.default.red(`Unknown command: ${command}`));
+            console.log(chalk_1.default.gray('Type /help for available commands.'));
+    }
+}
+// Interactive mode function
+async function runInteractiveMode() {
+    console.log(chalk_1.default.cyan(`\n🤖 Edgar v${version} - Claude Code Compatible CLI`));
+    console.log(chalk_1.default.gray('Type "exit" to quit, "/help" for commands\n'));
     const spinner = (0, ora_1.default)('Initializing Edgar...').start();
     try {
-        // Ensure directory structure exists
-        (0, path_utils_1.ensureDirectoryStructure)();
-        // Initialize managers
-        const configManager = new config_manager_1.ConfigManager();
-        const toolManager = new tool_manager_1.ToolManager();
-        const outputStyleManager = new output_style_manager_1.OutputStyleManager();
-        const llmProvider = llm_provider_factory_1.LLMProviderFactory.create(options.provider);
-        const subagentManager = new subagent_manager_1.SubagentManager(toolManager, llmProvider);
-        // Set output style if specified
-        if (options.style) {
-            outputStyleManager.setActiveStyle(options.style);
-        }
-        const masterLoop = new master_loop_v2_1.MasterLoop(llmProvider, toolManager, undefined, // HookManager
-        outputStyleManager);
+        const { masterLoop, outputStyleManager } = await initializeEdgar();
         spinner.succeed('Edgar initialized successfully!\n');
-        // Start interactive loop
         let isRunning = true;
         while (isRunning) {
             const { input } = await inquirer.prompt([
@@ -112,7 +153,7 @@ program
                 console.log(chalk_1.default.yellow('\nGoodbye! 👋\n'));
                 break;
             }
-            if (input.toLowerCase() === 'help') {
+            if (input.toLowerCase() === '/help' || input.toLowerCase() === 'help') {
                 showHelp();
                 continue;
             }
@@ -149,275 +190,48 @@ program
         }
         process.exit(1);
     }
-});
-// Task execution mode
-program
-    .command('task <description>')
-    .description('Execute a specific task')
-    .option('-s, --style <style>', 'Set output style')
-    .option('-p, --provider <provider>', 'Set LLM provider')
-    .action(async (description, options) => {
-    const spinner = (0, ora_1.default)('Executing task...').start();
-    try {
-        (0, path_utils_1.ensureDirectoryStructure)();
-        const toolManager = new tool_manager_1.ToolManager();
-        const outputStyleManager = new output_style_manager_1.OutputStyleManager();
-        const llmProvider = llm_provider_factory_1.LLMProviderFactory.create(options.provider);
-        if (options.style) {
-            outputStyleManager.setActiveStyle(options.style);
-        }
-        const masterLoop = new master_loop_v2_1.MasterLoop(llmProvider, toolManager, undefined, outputStyleManager);
-        await masterLoop.executeTask(description);
-        spinner.succeed('Task completed successfully!');
-    }
-    catch (error) {
-        spinner.fail('Task execution failed');
-        console.error(chalk_1.default.red('Error:'), error.message);
-        process.exit(1);
-    }
-});
-// Query mode
-program
-    .command('query <question>')
-    .description('Ask a single question')
-    .option('-s, --style <style>', 'Set output style')
-    .option('-p, --provider <provider>', 'Set LLM provider')
-    .action(async (question, options) => {
-    const spinner = (0, ora_1.default)('Processing query...').start();
-    try {
-        (0, path_utils_1.ensureDirectoryStructure)();
-        const toolManager = new tool_manager_1.ToolManager();
-        const outputStyleManager = new output_style_manager_1.OutputStyleManager();
-        const llmProvider = llm_provider_factory_1.LLMProviderFactory.create(options.provider);
-        if (options.style) {
-            outputStyleManager.setActiveStyle(options.style);
-        }
-        const masterLoop = new master_loop_v2_1.MasterLoop(llmProvider, toolManager, undefined, outputStyleManager);
-        const response = await masterLoop.executeQuery(question);
-        spinner.stop();
-        console.log('\n' + chalk_1.default.blue('Answer:'), response);
-    }
-    catch (error) {
-        spinner.fail('Query failed');
-        console.error(chalk_1.default.red('Error:'), error.message);
-        process.exit(1);
-    }
-});
-// Configuration commands
-program
-    .command('config')
-    .description('Manage Edgar configuration')
-    .option('-l, --list', 'List all configuration values')
-    .option('-s, --set <key=value>', 'Set a configuration value')
-    .option('-g, --get <key>', 'Get a configuration value')
-    .action(async (options) => {
-    const configManager = new config_manager_1.ConfigManager();
-    if (options.list) {
-        const config = configManager.getAll();
-        console.log(chalk_1.default.cyan('\nCurrent Configuration:'));
-        Object.entries(config).forEach(([key, value]) => {
-            console.log(`  ${chalk_1.default.yellow(key)}: ${value}`);
-        });
-    }
-    else if (options.set) {
-        const [key, value] = options.set.split('=');
-        configManager.set(key, value);
-        configManager.save();
-        console.log(chalk_1.default.green(`✓ Set ${key} = ${value}`));
-    }
-    else if (options.get) {
-        const value = configManager.get(options.get);
-        console.log(`${chalk_1.default.yellow(options.get)}: ${value || 'Not set'}`);
-    }
-    else {
-        console.log('Use --list, --set, or --get to manage configuration');
-    }
-});
-// Style management
-program
-    .command('style')
-    .description('Manage output styles')
-    .option('-l, --list', 'List available styles')
-    .option('-s, --set <name>', 'Set active style')
-    .option('-c, --create <name>', 'Create a new style')
-    .action(async (options) => {
-    const styleManager = new output_style_manager_1.OutputStyleManager();
-    if (options.list) {
-        const styles = styleManager.listStyles();
-        const activeStyle = styleManager.getActiveStyle();
-        console.log(chalk_1.default.cyan('\nAvailable Styles:'));
-        styles.forEach(style => {
-            const isActive = activeStyle?.name === style;
-            const marker = isActive ? chalk_1.default.green('✓') : ' ';
-            console.log(`  ${marker} ${style}`);
-        });
-    }
-    else if (options.set) {
-        if (styleManager.setActiveStyle(options.set)) {
-            console.log(chalk_1.default.green(`✓ Active style set to: ${options.set}`));
-        }
-        else {
-            console.log(chalk_1.default.red(`✗ Style not found: ${options.set}`));
-        }
-    }
-    else if (options.create) {
-        // Interactive style creation
-        const answers = await inquirer.prompt([
-            {
-                type: 'input',
-                name: 'description',
-                message: 'Style description:'
-            },
-            {
-                type: 'list',
-                name: 'baseStyle',
-                message: 'Base style:',
-                choices: styleManager.listStyles()
-            }
-        ]);
-        styleManager.createStyleFromTemplate(answers.baseStyle, options.create, { description: answers.description });
-        console.log(chalk_1.default.green(`✓ Created style: ${options.create}`));
-    }
-    else {
-        console.log('Use --list, --set, or --create to manage styles');
-    }
-});
-// Initialize command
-program
-    .command('init')
-    .description('Initialize Edgar in the current directory')
-    .action(async () => {
-    const spinner = (0, ora_1.default)('Initializing Edgar...').start();
-    try {
-        (0, path_utils_1.ensureDirectoryStructure)();
-        // Create default .edgar.env if it doesn't exist
-        const configDirs = (0, path_utils_1.getConfigDir)();
-        const envPath = path.join(configDirs.projectPath, '.edgar.env');
-        if (!fs.existsSync(envPath)) {
-            const template = `# Edgar Configuration
-# Add your LLM provider credentials here
-
-# Anthropic (Claude)
-# ANTHROPIC_API_KEY=your_key_here
-
-# OpenAI
-# OPENAI_API_KEY=your_key_here
-
-# Azure OpenAI
-# AZURE_OPENAI_ENDPOINT=your_endpoint_here
-# AZURE_OPENAI_KEY=your_key_here
-# AZURE_OPENAI_DEPLOYMENT=your_deployment_here
-
-# Default Provider
-LLM_PROVIDER=anthropic
-
-# General Settings
-LLM_TEMPERATURE=0.7
-LLM_MAX_TOKENS=4096
-`;
-            fs.writeFileSync(envPath, template);
-        }
-        spinner.succeed('Edgar initialized successfully!');
-        console.log(chalk_1.default.gray(`\nConfiguration directory: ${configDirs.projectPath}`));
-        console.log(chalk_1.default.gray(`Edit ${envPath} to add your API keys`));
-    }
-    catch (error) {
-        spinner.fail('Initialization failed');
-        console.error(chalk_1.default.red('Error:'), error.message);
-        process.exit(1);
-    }
-});
-// Helper functions
-function showHelp() {
-    console.log(chalk_1.default.cyan('\nAvailable Commands:'));
-    console.log('  exit, quit     - Exit Edgar');
-    console.log('  help          - Show this help message');
-    console.log('  /style <name> - Change output style');
-    console.log('  /styles       - List available styles');
-    console.log('  /clear        - Clear conversation history');
-    console.log('  /save <file>  - Save conversation to file');
-    console.log('  /load <file>  - Load conversation from file');
-    console.log();
 }
-async function handleCommand(command, masterLoop, styleManager) {
-    const parts = command.slice(1).split(' ');
-    const cmd = parts[0];
-    const args = parts.slice(1);
-    switch (cmd) {
-        case 'style':
-            if (args.length > 0) {
-                if (masterLoop.setOutputStyle(args[0])) {
-                    console.log(chalk_1.default.green(`✓ Style changed to: ${args[0]}`));
-                }
-                else {
-                    console.log(chalk_1.default.red(`✗ Unknown style: ${args[0]}`));
-                }
-            }
-            else {
-                console.log('Usage: /style <name>');
-            }
-            break;
-        case 'styles':
-            const styles = masterLoop.getOutputStyles();
-            console.log(chalk_1.default.cyan('Available styles:'), styles.join(', '));
-            break;
-        case 'clear':
-            masterLoop.clearHistory();
-            console.log(chalk_1.default.green('✓ Conversation history cleared'));
-            break;
-        case 'save':
-            if (args.length > 0) {
-                const history = masterLoop.getMessageHistory();
-                fs.writeJsonSync(args[0], history, { spaces: 2 });
-                console.log(chalk_1.default.green(`✓ Conversation saved to: ${args[0]}`));
-            }
-            else {
-                console.log('Usage: /save <filename>');
-            }
-            break;
-        case 'load':
-            if (args.length > 0 && fs.existsSync(args[0])) {
-                const history = fs.readJsonSync(args[0]);
-                // Note: Would need to add a method to load history in MasterLoop
-                console.log(chalk_1.default.green(`✓ Conversation loaded from: ${args[0]}`));
-            }
-            else {
-                console.log('Usage: /load <filename>');
-            }
-            break;
-        default:
-            console.log(chalk_1.default.red(`Unknown command: /${cmd}`));
+// Execute single prompt
+async function executePrompt(prompt) {
+    try {
+        // Silent initialization for single prompt mode
+        const { masterLoop } = await initializeEdgar();
+        const response = await masterLoop.processMessage(prompt);
+        // Output only the response, no extra formatting
+        console.log(response);
+    }
+    catch (error) {
+        console.error(chalk_1.default.red('Error:'), error.message);
+        process.exit(1);
     }
 }
-// Parse arguments and run
+// Configure CLI - Claude Code compatible
+program
+    .name('edgar')
+    .description('Edgar - Claude Code Compatible CLI')
+    .version(version, '-v, --version')
+    .option('-p, --prompt <prompt>', 'Execute a single prompt')
+    .option('-d, --debug', 'Enable debug mode')
+    .option('--no-color', 'Disable colored output')
+    .helpOption('-h, --help', 'Display help for command')
+    .action(async (options) => {
+    // Set debug mode if requested
+    if (options.debug) {
+        process.env.DEBUG = 'true';
+    }
+    // Handle single prompt execution
+    if (options.prompt) {
+        await executePrompt(options.prompt);
+    }
+    else {
+        // Default to interactive mode (like Claude Code)
+        await runInteractiveMode();
+    }
+});
+// Parse arguments
 program.parse(process.argv);
-// Handle uncaught exceptions
-process.on('uncaughtException', (error) => {
-    console.error('Uncaught Exception:', error);
-    process.exit(1);
-});
-// Handle unhandled promise rejections
-process.on('unhandledRejection', (reason, promise) => {
-    console.error('Unhandled Rejection at:', promise, 'reason:', reason);
-    process.exit(1);
-});
-// Export main components for library usage
-var cli_1 = require("./cli");
-Object.defineProperty(exports, "EdgarCLI", { enumerable: true, get: function () { return cli_1.EdgarCLI; } });
-var config_manager_2 = require("./config/config-manager");
-Object.defineProperty(exports, "ConfigManager", { enumerable: true, get: function () { return config_manager_2.ConfigManager; } });
-var master_loop_v2_2 = require("./core/master-loop-v2");
-Object.defineProperty(exports, "MasterLoop", { enumerable: true, get: function () { return master_loop_v2_2.MasterLoop; } });
-var session_manager_1 = require("./core/session-manager");
-Object.defineProperty(exports, "SessionManager", { enumerable: true, get: function () { return session_manager_1.SessionManager; } });
-var tool_manager_2 = require("./tools/tool-manager");
-Object.defineProperty(exports, "ToolManager", { enumerable: true, get: function () { return tool_manager_2.ToolManager; } });
-var base_tool_1 = require("./tools/base-tool");
-Object.defineProperty(exports, "BaseTool", { enumerable: true, get: function () { return base_tool_1.BaseTool; } });
-var subagent_manager_2 = require("./subagents/subagent-manager");
-Object.defineProperty(exports, "SubagentManager", { enumerable: true, get: function () { return subagent_manager_2.SubagentManager; } });
-var output_style_manager_2 = require("./output/output-style-manager");
-Object.defineProperty(exports, "OutputStyleManager", { enumerable: true, get: function () { return output_style_manager_2.OutputStyleManager; } });
-var llm_provider_factory_2 = require("./llm/llm-provider-factory");
-Object.defineProperty(exports, "LLMProviderFactory", { enumerable: true, get: function () { return llm_provider_factory_2.LLMProviderFactory; } });
+// If no arguments provided, run interactive mode
+if (process.argv.length === 2) {
+    runInteractiveMode();
+}
 //# sourceMappingURL=index.js.map
