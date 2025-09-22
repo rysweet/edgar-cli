@@ -1,6 +1,7 @@
 import * as fs from 'fs-extra';
 import * as path from 'path';
 import * as crypto from 'crypto';
+const writeFileAtomic = require('write-file-atomic');
 import { Session, ConversationEntry } from './types';
 import { getConfigDir } from '../config/path-utils';
 
@@ -19,7 +20,7 @@ export class SessionStorage {
     fs.ensureDirSync(path.join(this.sessionsDir, 'active'));
     fs.ensureDirSync(path.join(this.sessionsDir, 'archived'));
     if (!fs.existsSync(this.indexPath)) {
-      fs.writeJsonSync(this.indexPath, { sessions: [] });
+      this.writeJsonAtomicSync(this.indexPath, { sessions: [] });
     }
   }
   
@@ -42,7 +43,7 @@ export class SessionStorage {
       }))
     };
     
-    await fs.writeJson(sessionPath, serializable, { spaces: 2 });
+    await this.writeJsonAtomic(sessionPath, serializable);
     await this.updateIndex(session);
   }
   
@@ -64,7 +65,7 @@ export class SessionStorage {
   
   async findMostRecent(projectPath: string): Promise<Session | null> {
     const projectHash = this.hashPath(projectPath);
-    const index = await fs.readJson(this.indexPath);
+    const index = await this.readJsonSafe(this.indexPath);
     
     const projectSessions = index.sessions
       .filter((s: any) => s.projectHash === projectHash)
@@ -78,7 +79,7 @@ export class SessionStorage {
   }
   
   async listSessions(projectPath?: string): Promise<any[]> {
-    const index = await fs.readJson(this.indexPath);
+    const index = await this.readJsonSafe(this.indexPath);
     
     if (projectPath) {
       const projectHash = this.hashPath(projectPath);
@@ -103,38 +104,54 @@ export class SessionStorage {
     await fs.move(sourcePath, destPath);
     
     // Update index
-    const index = await fs.readJson(this.indexPath);
+    const index = await this.readJsonSafe(this.indexPath);
     const sessionIndex = index.sessions.findIndex((s: any) => s.id === sessionId);
     if (sessionIndex >= 0) {
       index.sessions[sessionIndex].archived = true;
       index.sessions[sessionIndex].archivedDate = date;
-      await fs.writeJson(this.indexPath, index, { spaces: 2 });
+      await this.writeJsonAtomic(this.indexPath, index);
     }
   }
   
   private async updateIndex(session: Session): Promise<void> {
-    const index = await fs.readJson(this.indexPath);
-    const projectHash = this.hashPath(session.projectPath);
+    // Retry logic for concurrent access
+    const maxRetries = 3;
+    let retries = 0;
     
-    const existingIndex = index.sessions.findIndex((s: any) => s.id === session.id);
-    
-    const sessionMeta = {
-      id: session.id,
-      projectPath: session.projectPath,
-      projectHash,
-      created: session.created.toISOString(),
-      updated: new Date().toISOString(),
-      messageCount: session.conversation.length,
-      archived: false
-    };
-    
-    if (existingIndex >= 0) {
-      index.sessions[existingIndex] = sessionMeta;
-    } else {
-      index.sessions.push(sessionMeta);
+    while (retries < maxRetries) {
+      try {
+        const index = await this.readJsonSafe(this.indexPath);
+        const projectHash = this.hashPath(session.projectPath);
+        
+        const existingIndex = index.sessions.findIndex((s: any) => s.id === session.id);
+        
+        const sessionMeta = {
+          id: session.id,
+          projectPath: session.projectPath,
+          projectHash,
+          created: session.created.toISOString(),
+          updated: new Date().toISOString(),
+          messageCount: session.conversation.length,
+          archived: false
+        };
+        
+        if (existingIndex >= 0) {
+          index.sessions[existingIndex] = sessionMeta;
+        } else {
+          index.sessions.push(sessionMeta);
+        }
+        
+        await this.writeJsonAtomic(this.indexPath, index);
+        break; // Success, exit loop
+      } catch (error) {
+        retries++;
+        if (retries >= maxRetries) {
+          throw new Error(`Failed to update index after ${maxRetries} attempts: ${error}`);
+        }
+        // Wait a bit before retrying
+        await new Promise(resolve => setTimeout(resolve, 100 * retries));
+      }
     }
-    
-    await fs.writeJson(this.indexPath, index, { spaces: 2 });
   }
   
   private hashPath(projectPath: string): string {
@@ -173,5 +190,35 @@ export class SessionStorage {
     }
     
     return null;
+  }
+  
+  private async writeJsonAtomic(filepath: string, data: any): Promise<void> {
+    const jsonStr = JSON.stringify(data, null, 2);
+    await writeFileAtomic(filepath, jsonStr, 'utf8');
+  }
+  
+  private writeJsonAtomicSync(filepath: string, data: any): void {
+    const jsonStr = JSON.stringify(data, null, 2);
+    writeFileAtomic.sync(filepath, jsonStr, 'utf8');
+  }
+  
+  private async readJsonSafe(filepath: string): Promise<any> {
+    try {
+      const content = await fs.readFile(filepath, 'utf8');
+      return JSON.parse(content);
+    } catch (error: any) {
+      if (error.code === 'ENOENT') {
+        // File doesn't exist, return empty structure
+        return { sessions: [] };
+      }
+      if (error instanceof SyntaxError) {
+        // JSON is corrupted, try to recover or reset
+        console.error(`Corrupted JSON in ${filepath}, resetting...`);
+        const backup = `${filepath}.backup.${Date.now()}`;
+        await fs.copyFile(filepath, backup).catch(() => {});
+        return { sessions: [] };
+      }
+      throw error;
+    }
   }
 }
