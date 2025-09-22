@@ -35,8 +35,9 @@ export class AzureOpenAIProvider implements ILLMProvider, LLMProvider {
       throw new Error('Azure OpenAI endpoint is required');
     }
     
-    if (!this.deploymentName) {
-      throw new Error('Azure OpenAI deployment name is required');
+    // Only require deployment name if it's not included in the endpoint URL
+    if (!this.deploymentName && !this.baseUrl.includes('/openai/deployments/')) {
+      throw new Error('Azure OpenAI deployment name is required when not included in endpoint URL');
     }
     
     this.config = {

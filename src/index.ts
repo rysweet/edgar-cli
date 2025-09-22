@@ -6,7 +6,7 @@ import * as path from 'path';
 import * as dotenv from 'dotenv';
 import chalk from 'chalk';
 import ora from 'ora';
-import * as inquirer from 'inquirer';
+const inquirer = require('inquirer').default || require('inquirer');
 import { EdgarCLI } from './cli';
 import { MasterLoop } from './core/master-loop-v2';
 import { LLMProviderFactory } from './llm/llm-provider-factory';
@@ -79,7 +79,7 @@ program
       let isRunning = true;
       
       while (isRunning) {
-        const { input } = await (inquirer as any).prompt([
+        const { input } = await inquirer.prompt([
           {
             type: 'input',
             name: 'input',
@@ -119,6 +119,20 @@ program
     } catch (error: any) {
       spinner.fail('Failed to initialize Edgar');
       console.error(chalk.red('Error:'), error.message);
+      
+      // Provide helpful debugging information
+      if (error.message.includes('Azure OpenAI')) {
+        console.log(chalk.yellow('\nAzure OpenAI Configuration:'));
+        console.log('  AZURE_OPENAI_ENDPOINT:', process.env.AZURE_OPENAI_ENDPOINT ? '✓ Set' : '✗ Not set');
+        console.log('  AZURE_OPENAI_KEY:', process.env.AZURE_OPENAI_KEY ? '✓ Set' : '✗ Not set');
+        console.log('  AZURE_OPENAI_DEPLOYMENT:', process.env.AZURE_OPENAI_DEPLOYMENT ? '✓ Set' : '✗ Not set');
+        console.log('\n  Ensure your .env file is properly configured.');
+      }
+      
+      if (process.env.DEBUG) {
+        console.error('\nFull error:', error);
+      }
+      
       process.exit(1);
     }
   });
