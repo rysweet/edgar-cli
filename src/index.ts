@@ -18,10 +18,18 @@ import { getConfigDir, ensureDirectoryStructure } from './config/path-utils';
 // Check if we're in prompt mode to suppress dotenv output
 const isPromptMode = process.argv.some(arg => arg === '-p' || arg === '--prompt');
 
-// Suppress console output during prompt mode
-const originalConsoleLog = console.log;
+// Intercept stdout to suppress dotenv messages in prompt mode
+const originalWrite = process.stdout.write;
 if (isPromptMode) {
-  console.log = () => {}; // Temporarily disable console.log
+  process.stdout.write = function(chunk: any, ...args: any[]): boolean {
+    // Filter out dotenv messages
+    const str = chunk?.toString() || '';
+    if (str.includes('[dotenv@') || str.includes('injecting env')) {
+      return true; // Pretend we wrote it
+    }
+    // @ts-ignore
+    return originalWrite.apply(process.stdout, [chunk, ...args]);
+  };
 }
 
 // Load environment variables
@@ -37,10 +45,8 @@ if (fs.existsSync(edgarEnvPath)) {
   dotenv.config({ path: edgarEnvPath });
 }
 
-// Restore console.log after dotenv loads
-if (isPromptMode) {
-  console.log = originalConsoleLog;
-}
+// Keep stdout filter active until after initialization
+// It will be restored when we start executing the prompt
 
 const program = new Command();
 const version = '0.1.0';
@@ -187,10 +193,20 @@ async function executePrompt(prompt: string) {
   try {
     // Silent initialization for single prompt mode
     const { masterLoop } = await initializeEdgar();
+    
+    // Restore stdout before processing the prompt
+    if (isPromptMode) {
+      process.stdout.write = originalWrite;
+    }
+    
     const response = await masterLoop.processMessage(prompt);
     // Output only the response, no extra formatting
     console.log(response);
   } catch (error: any) {
+    // Ensure stdout is restored for error output
+    if (isPromptMode) {
+      process.stdout.write = originalWrite;
+    }
     console.error(chalk.red('Error:'), error.message);
     process.exit(1);
   }

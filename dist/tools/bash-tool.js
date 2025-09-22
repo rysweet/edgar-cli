@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.BashTool = void 0;
 const base_tool_1 = require("./base-tool");
 const child_process_1 = require("child_process");
+const bash_output_tool_1 = require("./bash-output-tool");
 class BashTool extends base_tool_1.BaseTool {
     name = 'Bash';
     description = 'Executes bash commands in a shell with safety checks and output capture';
@@ -156,22 +157,23 @@ class BashTool extends base_tool_1.BaseTool {
         }
     }
     executeInBackground(command, workingDirectory) {
-        // For background execution, we spawn the process and return immediately
-        // In a real implementation, this would track the process and allow monitoring
+        // Generate unique ID for this background process
+        const bashId = `bash_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         const child = (0, child_process_1.spawn)(command, [], {
             shell: '/bin/bash',
             cwd: workingDirectory,
-            detached: true,
-            stdio: 'ignore'
+            detached: false, // Keep attached so we can capture output
+            stdio: ['ignore', 'pipe', 'pipe']
         });
-        // Unref the child process so it can run independently
-        child.unref();
+        // Register with BashProcessManager
+        const manager = bash_output_tool_1.BashProcessManager.getInstance();
+        manager.addProcess(bashId, child);
         return Promise.resolve({
             success: true,
-            output: 'Started in background',
+            output: `Started in background with ID: ${bashId}`,
             exitCode: 0,
             background: true,
-            message: `Command started in background with PID ${child.pid}`,
+            message: `Command started in background. Use BashOutput tool with bash_id="${bashId}" to retrieve output`,
             metadata: {
                 command,
                 workingDirectory,

@@ -50,7 +50,7 @@ run_test "Prompt flag (--prompt)" "edgar --help" "\-\-prompt"
 run_test "No provider flag" "edgar --help | grep -v provider; echo 'no-provider'" "no-provider"
 
 # Test 5: Single prompt execution
-run_test "Single prompt execution" "edgar -p 'echo test'" "test"
+run_test "Single prompt execution" "edgar -p 'What is 3+3?'" "6"
 
 # Test 6: Debug flag presence
 run_test "Debug flag (--debug)" "edgar --help" "\-\-debug"

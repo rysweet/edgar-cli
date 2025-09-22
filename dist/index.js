@@ -53,10 +53,18 @@ const config_manager_1 = require("./config/config-manager");
 const path_utils_1 = require("./config/path-utils");
 // Check if we're in prompt mode to suppress dotenv output
 const isPromptMode = process.argv.some(arg => arg === '-p' || arg === '--prompt');
-// Suppress console output during prompt mode
-const originalConsoleLog = console.log;
+// Intercept stdout to suppress dotenv messages in prompt mode
+const originalWrite = process.stdout.write;
 if (isPromptMode) {
-    console.log = () => { }; // Temporarily disable console.log
+    process.stdout.write = function (chunk, ...args) {
+        // Filter out dotenv messages
+        const str = chunk?.toString() || '';
+        if (str.includes('[dotenv@') || str.includes('injecting env')) {
+            return true; // Pretend we wrote it
+        }
+        // @ts-ignore
+        return originalWrite.apply(process.stdout, [chunk, ...args]);
+    };
 }
 // Load environment variables
 const configDirs = (0, path_utils_1.getConfigDir)();
@@ -69,10 +77,8 @@ const edgarEnvPath = path.join(configDirs.userPath, '.edgar.env');
 if (fs.existsSync(edgarEnvPath)) {
     dotenv.config({ path: edgarEnvPath });
 }
-// Restore console.log after dotenv loads
-if (isPromptMode) {
-    console.log = originalConsoleLog;
-}
+// Keep stdout filter active until after initialization
+// It will be restored when we start executing the prompt
 const program = new commander_1.Command();
 const version = '0.1.0';
 // Helper to initialize components
@@ -196,11 +202,19 @@ async function executePrompt(prompt) {
     try {
         // Silent initialization for single prompt mode
         const { masterLoop } = await initializeEdgar();
+        // Restore stdout before processing the prompt
+        if (isPromptMode) {
+            process.stdout.write = originalWrite;
+        }
         const response = await masterLoop.processMessage(prompt);
         // Output only the response, no extra formatting
         console.log(response);
     }
     catch (error) {
+        // Ensure stdout is restored for error output
+        if (isPromptMode) {
+            process.stdout.write = originalWrite;
+        }
         console.error(chalk_1.default.red('Error:'), error.message);
         process.exit(1);
     }

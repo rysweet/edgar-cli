@@ -1,6 +1,7 @@
 import { BaseTool, ToolDefinition } from './base-tool';
 import { execSync, spawn } from 'child_process';
 import * as path from 'path';
+import { BashProcessManager } from './bash-output-tool';
 
 export interface BashToolParameters {
   command: string;
@@ -204,25 +205,26 @@ export class BashTool extends BaseTool {
   }
 
   private executeInBackground(command: string, workingDirectory: string): Promise<BashToolResult> {
-    // For background execution, we spawn the process and return immediately
-    // In a real implementation, this would track the process and allow monitoring
+    // Generate unique ID for this background process
+    const bashId = `bash_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
     const child = spawn(command, [], {
       shell: '/bin/bash',
       cwd: workingDirectory,
-      detached: true,
-      stdio: 'ignore'
+      detached: false, // Keep attached so we can capture output
+      stdio: ['ignore', 'pipe', 'pipe']
     });
 
-    // Unref the child process so it can run independently
-    child.unref();
+    // Register with BashProcessManager
+    const manager = BashProcessManager.getInstance();
+    manager.addProcess(bashId, child);
 
     return Promise.resolve({
       success: true,
-      output: 'Started in background',
+      output: `Started in background with ID: ${bashId}`,
       exitCode: 0,
       background: true,
-      message: `Command started in background with PID ${child.pid}`,
+      message: `Command started in background. Use BashOutput tool with bash_id="${bashId}" to retrieve output`,
       metadata: {
         command,
         workingDirectory,

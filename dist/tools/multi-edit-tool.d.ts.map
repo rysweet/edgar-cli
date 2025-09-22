@@ -1,0 +1,1 @@
+{"version":3,"file":"multi-edit-tool.d.ts","sourceRoot":"","sources":["../../src/tools/multi-edit-tool.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,QAAQ,EAAE,cAAc,EAAE,MAAM,aAAa,CAAC;AAUvD,qBAAa,aAAc,SAAQ,QAAQ;IAClC,IAAI,SAAe;IACnB,WAAW,SAA2D;IAEtE,aAAa,IAAI,cAAc;IAuCzB,OAAO,CAAC,UAAU,EAAE,GAAG,GAAG,OAAO,CAAC,GAAG,CAAC;CAwCpD"}
