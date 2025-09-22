@@ -14,6 +14,7 @@ import { SubagentManager } from './subagents/subagent-manager';
 import { OutputStyleManager } from './output/output-style-manager';
 import { ConfigManager } from './config/config-manager';
 import { ConversationManager } from './memory/conversation-manager';
+import { ClaudeCodeUI } from './repl/claude-code-ui';
 import { getConfigDir, ensureDirectoryStructure } from './config/path-utils';
 
 // Check if we're in prompt mode to suppress dotenv output
@@ -131,74 +132,10 @@ async function handleCommand(input: string, masterLoop: any, outputStyleManager:
 
 // Interactive mode function
 async function runInteractiveMode(options: { continue?: boolean } = {}) {
-  console.log(chalk.cyan(`\n🤖 Edgar v${version} - Claude Code Compatible CLI`));
-  console.log(chalk.gray('Type "exit" to quit, "/help" for commands\n'));
-  
-  const spinner = ora('Initializing Edgar...').start();
-  
-  try {
-    const { masterLoop, outputStyleManager, conversationManager } = await initializeEdgar(options);
-    spinner.succeed('Edgar initialized successfully!\n');
-    
-    let isRunning = true;
-    
-    while (isRunning) {
-      const { input } = await inquirer.prompt([
-        {
-          type: 'input',
-          name: 'input',
-          message: chalk.green('You:'),
-          prefix: ''
-        }
-      ]);
-      
-      if (input.toLowerCase() === 'exit' || input.toLowerCase() === 'quit') {
-        isRunning = false;
-        console.log(chalk.yellow('\nGoodbye! 👋\n'));
-        break;
-      }
-      
-      if (input.toLowerCase() === '/help' || input.toLowerCase() === 'help') {
-        showHelp();
-        continue;
-      }
-      
-      if (input.startsWith('/')) {
-        await handleCommand(input, masterLoop, outputStyleManager);
-        continue;
-      }
-      
-      // Process user message
-      const responseSpinner = ora('Thinking...').start();
-      
-      try {
-        const response = await masterLoop.processMessage(input);
-        responseSpinner.stop();
-        console.log(chalk.blue('\nEdgar:'), response, '\n');
-      } catch (error: any) {
-        responseSpinner.fail('Error processing message');
-        console.error(chalk.red('Error:'), error.message);
-      }
-    }
-  } catch (error: any) {
-    spinner.fail('Failed to initialize Edgar');
-    console.error(chalk.red('Error:'), error.message);
-    
-    // Provide helpful debugging information
-    if (error.message.includes('Azure OpenAI')) {
-      console.log(chalk.yellow('\nAzure OpenAI Configuration:'));
-      console.log('  AZURE_OPENAI_ENDPOINT:', process.env.AZURE_OPENAI_ENDPOINT ? '✓ Set' : '✗ Not set');
-      console.log('  AZURE_OPENAI_KEY:', process.env.AZURE_OPENAI_KEY ? '✓ Set' : '✗ Not set');
-      console.log('  AZURE_OPENAI_DEPLOYMENT:', process.env.AZURE_OPENAI_DEPLOYMENT ? '✓ Set' : '✗ Not set');
-      console.log('\n  Ensure your .env file is properly configured.');
-    }
-    
-    if (process.env.DEBUG) {
-      console.error('\nFull error:', error);
-    }
-    
-    process.exit(1);
-  }
+  // Use the sophisticated Claude Code UI
+  const { masterLoop, outputStyleManager } = await initializeEdgar(options);
+  const ui = new ClaudeCodeUI(masterLoop, outputStyleManager);
+  await ui.start();
 }
 
 // Execute single prompt

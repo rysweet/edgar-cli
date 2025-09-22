@@ -42,7 +42,6 @@ const fs = __importStar(require("fs-extra"));
 const path = __importStar(require("path"));
 const dotenv = __importStar(require("dotenv"));
 const chalk_1 = __importDefault(require("chalk"));
-const ora_1 = __importDefault(require("ora"));
 const inquirer = require('inquirer').default || require('inquirer');
 const master_loop_v2_1 = require("./core/master-loop-v2");
 const llm_provider_factory_1 = require("./llm/llm-provider-factory");
@@ -51,6 +50,7 @@ const subagent_manager_1 = require("./subagents/subagent-manager");
 const output_style_manager_1 = require("./output/output-style-manager");
 const config_manager_1 = require("./config/config-manager");
 const conversation_manager_1 = require("./memory/conversation-manager");
+const claude_code_ui_1 = require("./repl/claude-code-ui");
 const path_utils_1 = require("./config/path-utils");
 // Check if we're in prompt mode to suppress dotenv output
 const isPromptMode = process.argv.some(arg => arg === '-p' || arg === '--prompt');
@@ -148,64 +148,10 @@ async function handleCommand(input, masterLoop, outputStyleManager) {
 }
 // Interactive mode function
 async function runInteractiveMode(options = {}) {
-    console.log(chalk_1.default.cyan(`\n🤖 Edgar v${version} - Claude Code Compatible CLI`));
-    console.log(chalk_1.default.gray('Type "exit" to quit, "/help" for commands\n'));
-    const spinner = (0, ora_1.default)('Initializing Edgar...').start();
-    try {
-        const { masterLoop, outputStyleManager, conversationManager } = await initializeEdgar(options);
-        spinner.succeed('Edgar initialized successfully!\n');
-        let isRunning = true;
-        while (isRunning) {
-            const { input } = await inquirer.prompt([
-                {
-                    type: 'input',
-                    name: 'input',
-                    message: chalk_1.default.green('You:'),
-                    prefix: ''
-                }
-            ]);
-            if (input.toLowerCase() === 'exit' || input.toLowerCase() === 'quit') {
-                isRunning = false;
-                console.log(chalk_1.default.yellow('\nGoodbye! 👋\n'));
-                break;
-            }
-            if (input.toLowerCase() === '/help' || input.toLowerCase() === 'help') {
-                showHelp();
-                continue;
-            }
-            if (input.startsWith('/')) {
-                await handleCommand(input, masterLoop, outputStyleManager);
-                continue;
-            }
-            // Process user message
-            const responseSpinner = (0, ora_1.default)('Thinking...').start();
-            try {
-                const response = await masterLoop.processMessage(input);
-                responseSpinner.stop();
-                console.log(chalk_1.default.blue('\nEdgar:'), response, '\n');
-            }
-            catch (error) {
-                responseSpinner.fail('Error processing message');
-                console.error(chalk_1.default.red('Error:'), error.message);
-            }
-        }
-    }
-    catch (error) {
-        spinner.fail('Failed to initialize Edgar');
-        console.error(chalk_1.default.red('Error:'), error.message);
-        // Provide helpful debugging information
-        if (error.message.includes('Azure OpenAI')) {
-            console.log(chalk_1.default.yellow('\nAzure OpenAI Configuration:'));
-            console.log('  AZURE_OPENAI_ENDPOINT:', process.env.AZURE_OPENAI_ENDPOINT ? '✓ Set' : '✗ Not set');
-            console.log('  AZURE_OPENAI_KEY:', process.env.AZURE_OPENAI_KEY ? '✓ Set' : '✗ Not set');
-            console.log('  AZURE_OPENAI_DEPLOYMENT:', process.env.AZURE_OPENAI_DEPLOYMENT ? '✓ Set' : '✗ Not set');
-            console.log('\n  Ensure your .env file is properly configured.');
-        }
-        if (process.env.DEBUG) {
-            console.error('\nFull error:', error);
-        }
-        process.exit(1);
-    }
+    // Use the sophisticated Claude Code UI
+    const { masterLoop, outputStyleManager } = await initializeEdgar(options);
+    const ui = new claude_code_ui_1.ClaudeCodeUI(masterLoop, outputStyleManager);
+    await ui.start();
 }
 // Execute single prompt
 async function executePrompt(prompt, options = {}) {

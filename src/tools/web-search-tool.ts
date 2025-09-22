@@ -62,8 +62,6 @@ export class WebSearchTool extends BaseTool {
     const { query, allowed_domains = [], blocked_domains = [] } = parameters;
 
     try {
-      // For demo purposes, return mock results
-      // In production, this would call a real search API
       const results = await this.performSearch(query);
 
       // Filter results based on domain rules
@@ -92,71 +90,40 @@ export class WebSearchTool extends BaseTool {
   }
 
   private async performSearch(query: string): Promise<SearchResult[]> {
-    // Mock implementation
-    // In production, this would call Google Custom Search API or similar
-    if (this.searchApiKey && this.searchEngineId) {
-      try {
-        const response = await axios.get('https://www.googleapis.com/customsearch/v1', {
-          params: {
-            key: this.searchApiKey,
-            cx: this.searchEngineId,
-            q: query,
-            num: 10
-          }
-        });
-
-        if (response.data.items) {
-          return response.data.items.map((item: any) => ({
-            title: item.title,
-            url: item.link,
-            snippet: item.snippet || '',
-            domain: new URL(item.link).hostname
-          }));
-        }
-      } catch (error) {
-        console.error('Search API error:', error);
-        // Fall back to mock results
-      }
+    if (!this.searchApiKey || !this.searchEngineId) {
+      throw new Error(
+        'Web search requires API configuration. Please set GOOGLE_API_KEY and GOOGLE_SEARCH_ENGINE_ID environment variables. ' +
+        'Get your API key from https://console.cloud.google.com/ and create a custom search engine at https://cse.google.com/'
+      );
     }
 
-    // Mock results for development
-    return this.getMockResults(query);
-  }
+    try {
+      const response = await axios.get('https://www.googleapis.com/customsearch/v1', {
+        params: {
+          key: this.searchApiKey,
+          cx: this.searchEngineId,
+          q: query,
+          num: 10
+        }
+      });
 
-  private getMockResults(query: string): SearchResult[] {
-    const mockResults: SearchResult[] = [
-      {
-        title: `Documentation for ${query}`,
-        url: `https://docs.example.com/${query.replace(/\s+/g, '-')}`,
-        snippet: `Comprehensive documentation about ${query} including examples and best practices.`,
-        domain: 'docs.example.com'
-      },
-      {
-        title: `${query} - Wikipedia`,
-        url: `https://en.wikipedia.org/wiki/${query.replace(/\s+/g, '_')}`,
-        snippet: `${query} is a topic that has various applications and meanings...`,
-        domain: 'en.wikipedia.org'
-      },
-      {
-        title: `Getting Started with ${query}`,
-        url: `https://www.tutorial.com/${query.replace(/\s+/g, '-')}`,
-        snippet: `Learn how to get started with ${query} in this comprehensive tutorial.`,
-        domain: 'www.tutorial.com'
-      },
-      {
-        title: `Stack Overflow - Questions tagged [${query}]`,
-        url: `https://stackoverflow.com/questions/tagged/${query.replace(/\s+/g, '-')}`,
-        snippet: `Questions and answers about ${query} from the developer community.`,
-        domain: 'stackoverflow.com'
-      },
-      {
-        title: `GitHub - ${query} repositories`,
-        url: `https://github.com/search?q=${encodeURIComponent(query)}`,
-        snippet: `Find open source projects related to ${query} on GitHub.`,
-        domain: 'github.com'
+      if (response.data.items) {
+        return response.data.items.map((item: any) => ({
+          title: item.title,
+          url: item.link,
+          snippet: item.snippet || '',
+          domain: new URL(item.link).hostname
+        }));
       }
-    ];
-
-    return mockResults;
+      
+      return [];
+    } catch (error: any) {
+      if (error.response?.status === 403) {
+        throw new Error('Google API quota exceeded or invalid API key');
+      } else if (error.response?.status === 400) {
+        throw new Error('Invalid search query or search engine ID');
+      }
+      throw new Error(`Search API error: ${error.message}`);
+    }
   }
 }

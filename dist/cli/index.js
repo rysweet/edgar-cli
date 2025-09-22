@@ -145,7 +145,75 @@ class EdgarCLI {
     }
     async handleCommit() {
         console.log('Creating git commit...');
-        // TODO: Implement git commit functionality
+        try {
+            const { execSync } = require('child_process');
+            const fs = require('fs-extra');
+            const path = require('path');
+            // Check if we're in a git repository
+            try {
+                execSync('git rev-parse --is-inside-work-tree', { encoding: 'utf-8' });
+            }
+            catch {
+                console.error('Error: Not in a git repository');
+                return;
+            }
+            // Check for changes
+            const status = execSync('git status --porcelain', { encoding: 'utf-8' });
+            if (!status.trim()) {
+                console.log('No changes to commit');
+                return;
+            }
+            // Show current status
+            console.log('\nCurrent changes:');
+            console.log(execSync('git status --short', { encoding: 'utf-8' }));
+            // Get commit message from user
+            const inquirer = require('inquirer');
+            const { message } = await inquirer.prompt([
+                {
+                    type: 'input',
+                    name: 'message',
+                    message: 'Commit message:',
+                    validate: (input) => input.trim() ? true : 'Commit message cannot be empty'
+                }
+            ]);
+            // Stage all changes
+            const { confirmStage } = await inquirer.prompt([
+                {
+                    type: 'confirm',
+                    name: 'confirmStage',
+                    message: 'Stage all changes?',
+                    default: true
+                }
+            ]);
+            if (confirmStage) {
+                execSync('git add -A');
+            }
+            // Create commit with Edgar signature
+            const commitMessage = `${message}
+
+🤖 Created with Edgar CLI
+Co-Authored-By: Edgar <edgar@edgar-cli.com>`;
+            execSync(`git commit -m "${commitMessage.replace(/"/g, '\\"')}"`, { encoding: 'utf-8' });
+            console.log('✅ Commit created successfully!');
+            // Ask about pushing
+            const { shouldPush } = await inquirer.prompt([
+                {
+                    type: 'confirm',
+                    name: 'shouldPush',
+                    message: 'Push to remote?',
+                    default: false
+                }
+            ]);
+            if (shouldPush) {
+                const branch = execSync('git branch --show-current', { encoding: 'utf-8' }).trim();
+                console.log(`Pushing to origin/${branch}...`);
+                execSync(`git push origin ${branch}`, { encoding: 'utf-8' });
+                console.log('✅ Pushed successfully!');
+            }
+        }
+        catch (error) {
+            console.error(`Error creating commit: ${error.message}`);
+        }
     }
 }
 exports.EdgarCLI = EdgarCLI;

@@ -16,6 +16,7 @@ export declare class ConversationManager {
     loadSession(sessionId: string): Promise<Session | null>;
     private estimateTokens;
     private captureEnvironment;
+    private getTrackedFiles;
     private getGitStatus;
     private getSanitizedEnvVars;
 }

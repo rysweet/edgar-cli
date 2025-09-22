@@ -165,11 +165,60 @@ class ConversationManager {
         }
         return {
             cwd,
-            files: [], // TODO: Implement file tracking
+            files: await this.getTrackedFiles(),
             gitStatus: await this.getGitStatus(),
             envVars: this.getSanitizedEnvVars(),
             claudeMd
         };
+    }
+    async getTrackedFiles() {
+        // Track recently accessed files from the current working directory
+        const trackedFiles = [];
+        const cwd = process.cwd();
+        try {
+            const { execSync } = require('child_process');
+            const fs = require('fs-extra');
+            const path = require('path');
+            // Try to use git to get recently modified tracked files
+            let filePaths = [];
+            try {
+                const gitFiles = execSync('git ls-files --modified --others --exclude-standard | head -20', {
+                    cwd,
+                    encoding: 'utf-8'
+                }).trim().split('\n').filter(Boolean);
+                filePaths = gitFiles;
+            }
+            catch {
+                // Not a git repo, fall back to find command
+                try {
+                    const recentFiles = execSync('find . -type f -name "*.js" -o -name "*.ts" -o -name "*.json" -o -name "*.md" | grep -v node_modules | grep -v ".git" | head -20', { cwd, encoding: 'utf-8' }).trim().split('\n').filter(Boolean);
+                    filePaths = recentFiles.map((f) => f.replace(/^\.\//, ''));
+                }
+                catch {
+                    // If find fails, just return empty array
+                    return [];
+                }
+            }
+            // Convert file paths to FileSnapshot objects
+            for (const filePath of filePaths) {
+                try {
+                    const fullPath = path.join(cwd, filePath);
+                    const stats = fs.statSync(fullPath);
+                    trackedFiles.push({
+                        path: filePath,
+                        modified: stats.mtime,
+                        size: stats.size
+                    });
+                }
+                catch {
+                    // Skip files that can't be accessed
+                }
+            }
+        }
+        catch {
+            // Ignore errors and return what we have
+        }
+        return trackedFiles;
     }
     async getGitStatus() {
         try {
