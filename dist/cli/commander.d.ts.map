@@ -1,0 +1,1 @@
+{"version":3,"file":"commander.d.ts","sourceRoot":"","sources":["../../src/cli/commander.ts"],"names":[],"mappings":"AAAA,qBAAa,SAAS;IACpB,OAAO,CAAC,QAAQ,CAA+B;;IAM/C,OAAO,CAAC,kBAAkB;IAkBnB,OAAO,CAAC,OAAO,EAAE,MAAM,EAAE,GAAG,IAAI,EAAE,GAAG,EAAE,GAAG,IAAI;IAS9C,UAAU,CAAC,OAAO,EAAE,MAAM,GAAG,OAAO;CAG5C"}
