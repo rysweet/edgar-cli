@@ -58,11 +58,18 @@ export class MasterLoop {
 
     // Initialize conversation on first message only
     if (!this.isConversationStarted) {
-      // Start a new session if needed
-      const session = await this.conversationManager.startSession();
+      // Check if session already exists (from initialization)
+      const currentSession = this.conversationManager.getCurrentSession();
+      if (!currentSession) {
+        // Only start new session if one doesn't exist
+        await this.conversationManager.startSession();
+      }
       
-      // Add system prompt
-      await this.conversationManager.addSystemMessage(styledSystemPrompt);
+      // Add system prompt if conversation is empty
+      const history = this.conversationManager.getConversationHistory();
+      if (history.length === 0) {
+        await this.conversationManager.addSystemMessage(styledSystemPrompt);
+      }
       
       // Load message history from conversation manager
       this.messageHistory = this.conversationManager.getConversationHistory();
