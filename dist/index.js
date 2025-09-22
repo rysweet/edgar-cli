@@ -50,7 +50,7 @@ const subagent_manager_1 = require("./subagents/subagent-manager");
 const output_style_manager_1 = require("./output/output-style-manager");
 const config_manager_1 = require("./config/config-manager");
 const conversation_manager_1 = require("./memory/conversation-manager");
-const claude_ui_1 = require("./repl/claude-ui");
+const claude_code_ui_1 = require("./repl/claude-code-ui");
 const path_utils_1 = require("./config/path-utils");
 // Check if we're in prompt mode to suppress dotenv output
 const isPromptMode = process.argv.some(arg => arg === '-p' || arg === '--prompt');
@@ -148,10 +148,10 @@ async function handleCommand(input, masterLoop, outputStyleManager) {
 }
 // Interactive mode function
 async function runInteractiveMode(options = {}) {
-    // Always use Claude-style minimal UI - it's the default now
+    // Use the sophisticated Claude Code UI
     const { masterLoop, outputStyleManager } = await initializeEdgar(options);
-    const repl = new claude_ui_1.ClaudeStyleREPL(masterLoop, outputStyleManager);
-    await repl.start();
+    const ui = new claude_code_ui_1.ClaudeCodeUI(masterLoop, outputStyleManager);
+    await ui.start();
 }
 // Execute single prompt
 async function executePrompt(prompt, options = {}) {

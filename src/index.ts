@@ -14,7 +14,7 @@ import { SubagentManager } from './subagents/subagent-manager';
 import { OutputStyleManager } from './output/output-style-manager';
 import { ConfigManager } from './config/config-manager';
 import { ConversationManager } from './memory/conversation-manager';
-import { ClaudeStyleREPL } from './repl/claude-ui';
+import { ClaudeCodeUI } from './repl/claude-code-ui';
 import { getConfigDir, ensureDirectoryStructure } from './config/path-utils';
 
 // Check if we're in prompt mode to suppress dotenv output
@@ -132,10 +132,10 @@ async function handleCommand(input: string, masterLoop: any, outputStyleManager:
 
 // Interactive mode function
 async function runInteractiveMode(options: { continue?: boolean } = {}) {
-  // Always use Claude-style minimal UI - it's the default now
+  // Use the sophisticated Claude Code UI
   const { masterLoop, outputStyleManager } = await initializeEdgar(options);
-  const repl = new ClaudeStyleREPL(masterLoop, outputStyleManager);
-  await repl.start();
+  const ui = new ClaudeCodeUI(masterLoop, outputStyleManager);
+  await ui.start();
 }
 
 // Execute single prompt
