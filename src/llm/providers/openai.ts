@@ -15,8 +15,8 @@ export class OpenAIProvider implements ILLMProvider, LLMProvider {
   constructor(config: LLMProviderConfig) {
     this.apiKey = config.apiKey || process.env.OPENAI_API_KEY || '';
     this.model = config.model || process.env.OPENAI_MODEL || 'gpt-4-turbo-preview';
-    this.maxTokens = config.maxTokens || parseInt(process.env.OPENAI_MAX_TOKENS || '4096');
-    this.temperature = config.temperature ?? 0.7;
+    this.maxTokens = config.maxTokens || parseInt(process.env.OPENAI_MAX_TOKENS || '512000');
+    this.temperature = config.temperature ?? 1.0;
     this.topP = config.topP ?? 1.0;
     this.organization = config.organization || process.env.OPENAI_ORGANIZATION;
     

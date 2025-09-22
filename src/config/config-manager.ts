@@ -87,8 +87,8 @@ export class ConfigManager {
     return {
       provider: 'anthropic',
       model: 'claude-3-sonnet-20240229',
-      maxTokens: 4096,
-      temperature: 0.7,
+      maxTokens: 512000,
+      temperature: 1.0,
       outputStyle: 'default',
       maxRetries: 3,
       timeout: 120000,
