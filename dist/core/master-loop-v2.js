@@ -6,18 +6,28 @@ const tool_manager_1 = require("../tools/tool-manager");
 const hook_manager_1 = require("../hooks/hook-manager");
 const output_style_manager_1 = require("../output/output-style-manager");
 const config_manager_1 = require("../config/config-manager");
+const conversation_manager_1 = require("../memory/conversation-manager");
 class MasterLoop {
     llmProvider;
     toolManager;
     hookManager;
     outputStyleManager;
+    conversationManager;
     messageHistory = [];
     isRunning = false;
-    constructor(llmProvider, toolManager, hookManager, outputStyleManager) {
+    isConversationStarted = false;
+    constructor(llmProvider, toolManager, hookManager, outputStyleManager, conversationManager) {
         this.llmProvider = llmProvider || llm_provider_factory_1.LLMProviderFactory.create();
         this.toolManager = toolManager || new tool_manager_1.ToolManager();
         this.hookManager = hookManager || new hook_manager_1.HookManager(new config_manager_1.ConfigManager());
         this.outputStyleManager = outputStyleManager || new output_style_manager_1.OutputStyleManager();
+        this.conversationManager = conversationManager || new conversation_manager_1.ConversationManager();
+        // If conversation manager already has history, we're continuing a session
+        const existingHistory = this.conversationManager.getConversationHistory();
+        if (existingHistory && existingHistory.length > 0) {
+            this.messageHistory = existingHistory;
+            this.isConversationStarted = true;
+        }
     }
     async processMessage(userMessage, systemPrompt) {
         // Apply output style to system prompt
@@ -25,17 +35,20 @@ class MasterLoop {
         const styledSystemPrompt = systemPrompt
             ? formatter.formatSystemPrompt(systemPrompt)
             : formatter.formatSystemPrompt('You are Edgar, an AI coding assistant.');
-        // Initialize conversation with system prompt
-        this.messageHistory = [
-            {
-                role: 'system',
-                content: styledSystemPrompt
-            },
-            {
-                role: 'user',
-                content: userMessage
-            }
-        ];
+        // Initialize conversation on first message only
+        if (!this.isConversationStarted) {
+            // Start a new session if needed
+            const session = await this.conversationManager.startSession();
+            // Add system prompt
+            await this.conversationManager.addSystemMessage(styledSystemPrompt);
+            // Load message history from conversation manager
+            this.messageHistory = this.conversationManager.getConversationHistory();
+            this.isConversationStarted = true;
+        }
+        // Add user message to conversation manager
+        await this.conversationManager.addUserMessage(userMessage);
+        // Update local message history
+        this.messageHistory = this.conversationManager.getConversationHistory();
         // Run the main loop
         const response = await this.runLoop();
         // Apply any post-processing from output style
@@ -95,28 +108,24 @@ class MasterLoop {
                 // Parse response for tool calls
                 const toolCalls = this.parseToolCalls(response);
                 if (toolCalls.length > 0) {
-                    // Add assistant response with tool calls to history
-                    this.messageHistory.push({
-                        role: 'assistant',
-                        content: response,
-                        toolCalls
-                    });
+                    // Add assistant response with tool calls to conversation manager
+                    await this.conversationManager.addAssistantMessage(response, toolCalls);
+                    // Update local message history
+                    this.messageHistory = this.conversationManager.getConversationHistory();
                     // Execute tools
                     const toolResults = await this.executeToolCalls(toolCalls);
-                    // Add tool results to history
-                    this.messageHistory.push({
-                        role: 'tool',
-                        content: 'Tool execution results',
-                        toolResults
-                    });
+                    // Add tool results to history (for now, as system message)
+                    await this.conversationManager.addSystemMessage(`Tool execution results: ${JSON.stringify(toolResults)}`);
+                    // Update local message history
+                    this.messageHistory = this.conversationManager.getConversationHistory();
                 }
                 else {
                     // No more tool calls, save final response and exit loop
                     finalResponse = response;
-                    this.messageHistory.push({
-                        role: 'assistant',
-                        content: response
-                    });
+                    // Save assistant response to conversation manager
+                    await this.conversationManager.addAssistantMessage(response);
+                    // Update local message history
+                    this.messageHistory = this.conversationManager.getConversationHistory();
                     this.isRunning = false;
                 }
             }
@@ -179,8 +188,10 @@ class MasterLoop {
     getMessageHistory() {
         return [...this.messageHistory];
     }
-    clearHistory() {
+    async clearHistory() {
+        await this.conversationManager.clearConversation();
         this.messageHistory = [];
+        this.isConversationStarted = false;
     }
     stop() {
         this.isRunning = false;

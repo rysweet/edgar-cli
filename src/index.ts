@@ -13,6 +13,7 @@ import { ToolManager } from './tools/tool-manager';
 import { SubagentManager } from './subagents/subagent-manager';
 import { OutputStyleManager } from './output/output-style-manager';
 import { ConfigManager } from './config/config-manager';
+import { ConversationManager } from './memory/conversation-manager';
 import { getConfigDir, ensureDirectoryStructure } from './config/path-utils';
 
 // Check if we're in prompt mode to suppress dotenv output
@@ -52,7 +53,7 @@ const program = new Command();
 const version = '0.1.0';
 
 // Helper to initialize components
-async function initializeEdgar() {
+async function initializeEdgar(options: { continue?: boolean } = {}) {
   ensureDirectoryStructure();
   
   const configManager = new ConfigManager();
@@ -60,15 +61,27 @@ async function initializeEdgar() {
   const outputStyleManager = new OutputStyleManager();
   const llmProvider = LLMProviderFactory.create(); // Use env var, not CLI flag
   const subagentManager = new SubagentManager(toolManager, llmProvider);
+  const conversationManager = new ConversationManager();
   
+  // Start or continue session BEFORE creating MasterLoop
+  const session = await conversationManager.startSession(options);
+  
+  // Now create MasterLoop which will detect existing conversation
   const masterLoop = new MasterLoop(
     llmProvider,
     toolManager,
     undefined, // HookManager
-    outputStyleManager
+    outputStyleManager,
+    conversationManager
   );
   
-  return { masterLoop, outputStyleManager, configManager };
+  // Log session info in debug mode
+  if (process.env.DEBUG) {
+    console.log('Session ID:', session.id);
+    console.log('Conversation length:', session.conversation.length);
+  }
+  
+  return { masterLoop, outputStyleManager, configManager, conversationManager };
 }
 
 // Show help for slash commands
@@ -93,8 +106,8 @@ async function handleCommand(input: string, masterLoop: any, outputStyleManager:
       showHelp();
       break;
     case '/clear':
+      await masterLoop.clearHistory();
       console.log(chalk.yellow('Conversation cleared.'));
-      // TODO: Implement conversation clearing
       break;
     case '/style':
       if (parts[1]) {
@@ -117,14 +130,14 @@ async function handleCommand(input: string, masterLoop: any, outputStyleManager:
 }
 
 // Interactive mode function
-async function runInteractiveMode() {
+async function runInteractiveMode(options: { continue?: boolean } = {}) {
   console.log(chalk.cyan(`\n🤖 Edgar v${version} - Claude Code Compatible CLI`));
   console.log(chalk.gray('Type "exit" to quit, "/help" for commands\n'));
   
   const spinner = ora('Initializing Edgar...').start();
   
   try {
-    const { masterLoop, outputStyleManager } = await initializeEdgar();
+    const { masterLoop, outputStyleManager, conversationManager } = await initializeEdgar(options);
     spinner.succeed('Edgar initialized successfully!\n');
     
     let isRunning = true;
@@ -189,10 +202,10 @@ async function runInteractiveMode() {
 }
 
 // Execute single prompt
-async function executePrompt(prompt: string) {
+async function executePrompt(prompt: string, options: { continue?: boolean } = {}) {
   try {
     // Silent initialization for single prompt mode
-    const { masterLoop } = await initializeEdgar();
+    const { masterLoop } = await initializeEdgar(options);
     
     // Restore stdout before processing the prompt
     if (isPromptMode) {
@@ -218,6 +231,7 @@ program
   .description('Edgar - Claude Code Compatible CLI')
   .version(version, '-v, --version')
   .option('-p, --prompt <prompt>', 'Execute a single prompt')
+  .option('-c, --continue', 'Continue from the previous session')
   .option('-d, --debug', 'Enable debug mode')
   .option('--no-color', 'Disable colored output')
   .helpOption('-h, --help', 'Display help for command')
@@ -229,10 +243,10 @@ program
     
     // Handle single prompt execution
     if (options.prompt) {
-      await executePrompt(options.prompt);
+      await executePrompt(options.prompt, { continue: options.continue });
     } else {
       // Default to interactive mode (like Claude Code)
-      await runInteractiveMode();
+      await runInteractiveMode({ continue: options.continue });
     }
   });
 
@@ -241,5 +255,5 @@ program.parse(process.argv);
 
 // If no arguments provided, run interactive mode
 if (process.argv.length === 2) {
-  runInteractiveMode();
+  runInteractiveMode({});
 }

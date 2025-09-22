@@ -4,6 +4,7 @@ import { ToolManager } from '../tools/tool-manager';
 import { HookManager } from '../hooks/hook-manager';
 import { OutputStyleManager } from '../output/output-style-manager';
 import { ConfigManager } from '../config/config-manager';
+import { ConversationManager } from '../memory/conversation-manager';
 
 export interface ToolCall {
   name: string;
@@ -22,19 +23,30 @@ export class MasterLoop {
   private toolManager: ToolManager;
   private hookManager: HookManager;
   private outputStyleManager: OutputStyleManager;
+  private conversationManager: ConversationManager;
   private messageHistory: LoopMessage[] = [];
   private isRunning: boolean = false;
+  private isConversationStarted: boolean = false;
 
   constructor(
     llmProvider?: LLMProvider,
     toolManager?: ToolManager,
     hookManager?: HookManager,
-    outputStyleManager?: OutputStyleManager
+    outputStyleManager?: OutputStyleManager,
+    conversationManager?: ConversationManager
   ) {
     this.llmProvider = llmProvider || LLMProviderFactory.create();
     this.toolManager = toolManager || new ToolManager();
     this.hookManager = hookManager || new HookManager(new ConfigManager());
     this.outputStyleManager = outputStyleManager || new OutputStyleManager();
+    this.conversationManager = conversationManager || new ConversationManager();
+    
+    // If conversation manager already has history, we're continuing a session
+    const existingHistory = this.conversationManager.getConversationHistory();
+    if (existingHistory && existingHistory.length > 0) {
+      this.messageHistory = existingHistory;
+      this.isConversationStarted = true;
+    }
   }
 
   public async processMessage(userMessage: string, systemPrompt?: string): Promise<string> {
@@ -44,17 +56,24 @@ export class MasterLoop {
       ? formatter.formatSystemPrompt(systemPrompt)
       : formatter.formatSystemPrompt('You are Edgar, an AI coding assistant.');
 
-    // Initialize conversation with system prompt
-    this.messageHistory = [
-      {
-        role: 'system',
-        content: styledSystemPrompt
-      },
-      {
-        role: 'user',
-        content: userMessage
-      }
-    ];
+    // Initialize conversation on first message only
+    if (!this.isConversationStarted) {
+      // Start a new session if needed
+      const session = await this.conversationManager.startSession();
+      
+      // Add system prompt
+      await this.conversationManager.addSystemMessage(styledSystemPrompt);
+      
+      // Load message history from conversation manager
+      this.messageHistory = this.conversationManager.getConversationHistory();
+      this.isConversationStarted = true;
+    }
+    
+    // Add user message to conversation manager
+    await this.conversationManager.addUserMessage(userMessage);
+    
+    // Update local message history
+    this.messageHistory = this.conversationManager.getConversationHistory();
 
     // Run the main loop
     const response = await this.runLoop();
@@ -127,29 +146,32 @@ export class MasterLoop {
         const toolCalls = this.parseToolCalls(response);
 
         if (toolCalls.length > 0) {
-          // Add assistant response with tool calls to history
-          this.messageHistory.push({
-            role: 'assistant',
-            content: response,
-            toolCalls
-          });
+          // Add assistant response with tool calls to conversation manager
+          await this.conversationManager.addAssistantMessage(response, toolCalls);
+          
+          // Update local message history
+          this.messageHistory = this.conversationManager.getConversationHistory();
 
           // Execute tools
           const toolResults = await this.executeToolCalls(toolCalls);
           
-          // Add tool results to history
-          this.messageHistory.push({
-            role: 'tool',
-            content: 'Tool execution results',
-            toolResults
-          });
+          // Add tool results to history (for now, as system message)
+          await this.conversationManager.addSystemMessage(
+            `Tool execution results: ${JSON.stringify(toolResults)}`
+          );
+          
+          // Update local message history
+          this.messageHistory = this.conversationManager.getConversationHistory();
         } else {
           // No more tool calls, save final response and exit loop
           finalResponse = response;
-          this.messageHistory.push({
-            role: 'assistant',
-            content: response
-          });
+          
+          // Save assistant response to conversation manager
+          await this.conversationManager.addAssistantMessage(response);
+          
+          // Update local message history
+          this.messageHistory = this.conversationManager.getConversationHistory();
+          
           this.isRunning = false;
         }
       } catch (error) {
@@ -225,8 +247,10 @@ export class MasterLoop {
     return [...this.messageHistory];
   }
 
-  public clearHistory(): void {
+  public async clearHistory(): Promise<void> {
+    await this.conversationManager.clearConversation();
     this.messageHistory = [];
+    this.isConversationStarted = false;
   }
 
   public stop(): void {
