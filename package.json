@@ -1,10 +1,11 @@
 {
-  "name": "@edgar/cli",
+  "name": "edgar-cli",
   "version": "0.1.0",
   "description": "Edgar - A Claude Code-compatible CLI for agentic coding",
   "main": "dist/index.js",
   "bin": {
-    "edgar": "dist/index.js"
+    "edgar": "dist/index.js",
+    "edgar-cli": "dist/index.js"
   },
   "scripts": {
     "build": "tsc",
@@ -15,7 +16,8 @@
     "lint": "eslint src --ext .ts",
     "format": "prettier --write \"src/**/*.ts\" \"tests/**/*.ts\"",
     "clean": "rm -rf dist coverage",
-    "prepublish": "npm run build"
+    "prepublish": "npm run build",
+    "postinstall": "npm run build"
   },
   "keywords": [
     "cli",
@@ -26,6 +28,14 @@
   ],
   "author": "",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rysweet/edgar-cli.git"
+  },
+  "bugs": {
+    "url": "https://github.com/rysweet/edgar-cli/issues"
+  },
+  "homepage": "https://github.com/rysweet/edgar-cli#readme",
   "type": "commonjs",
   "devDependencies": {
     "@types/fs-extra": "^11.0.4",
