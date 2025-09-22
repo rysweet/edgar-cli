@@ -19,6 +19,47 @@ All major features have been implemented and tested:
 - ✅ Working executable with npm link
 - ✅ End-to-end testing verified
 
+## Installation
+
+### Quick Start (No Installation)
+
+Run Edgar directly from GitHub using npx:
+
+```bash
+# Run Edgar directly without installing
+npx github:rysweet/edgar-cli --help
+
+# Or use the full GitHub URL
+npx git+https://github.com/rysweet/edgar-cli.git --help
+
+# Start an interactive chat session
+npx github:rysweet/edgar-cli chat
+```
+
+### Local Installation
+
+#### Prerequisites
+- Node.js 18.0 or higher
+- npm
+
+```bash
+# Clone the repository
+git clone https://github.com/rysweet/edgar-cli.git
+cd edgar-cli
+
+# Install dependencies
+npm install
+
+# Build the project
+npm run build
+
+# Link globally (optional)
+npm link
+
+# Now you can use edgar from anywhere
+edgar --help
+```
+
 ## Features
 
 ### Core Functionality
@@ -50,29 +91,6 @@ All major features have been implemented and tested:
 - **Workflow**: Improvement Workflow, Cleanup, Pre-commit Diagnostic
 - **Specialized**: Prompt Writer, Preference Reviewer, Output Style Setup
 
-## Installation
-
-### Prerequisites
-- Node.js 18.0 or higher
-- npm
-
-### Setup
-```bash
-# Clone the repository
-cd edgar
-
-# Install dependencies
-npm install
-
-# Build the project
-npm run build
-
-# Link globally
-npm link
-
-# Initialize Edgar
-edgar init
-```
 
 ## Configuration
 
