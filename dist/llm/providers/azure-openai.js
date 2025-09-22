@@ -20,8 +20,8 @@ class AzureOpenAIProvider {
         this.deploymentName = config.deploymentName || process.env.AZURE_OPENAI_DEPLOYMENT || '';
         this.model = config.model || process.env.AZURE_OPENAI_MODEL || 'gpt-4';
         this.apiVersion = config.apiVersion || process.env.AZURE_OPENAI_API_VERSION || '2024-02-15-preview';
-        this.maxTokens = config.maxTokens || parseInt(process.env.AZURE_OPENAI_MAX_TOKENS || '4096');
-        this.temperature = config.temperature ?? 0.7;
+        this.maxTokens = config.maxTokens || parseInt(process.env.AZURE_OPENAI_MAX_TOKENS || '512000');
+        this.temperature = config.temperature ?? 1.0;
         this.topP = config.topP ?? 1.0;
         // Azure OpenAI endpoint format: https://<resource-name>.openai.azure.com/
         const resourceName = process.env.AZURE_OPENAI_RESOURCE_NAME || '';

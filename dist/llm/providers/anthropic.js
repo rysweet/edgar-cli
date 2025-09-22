@@ -14,7 +14,7 @@ class AnthropicProvider {
     constructor(config) {
         this.apiKey = config.apiKey || process.env.ANTHROPIC_API_KEY || '';
         this.model = config.model || process.env.ANTHROPIC_MODEL || 'claude-3-sonnet-20240229';
-        this.maxTokens = config.maxTokens || parseInt(process.env.ANTHROPIC_MAX_TOKENS || '4096');
+        this.maxTokens = config.maxTokens || parseInt(process.env.ANTHROPIC_MAX_TOKENS || '512000');
         this.config = {
             apiKey: this.apiKey,
             model: this.model,

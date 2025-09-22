@@ -8,8 +8,8 @@ export class LLMProviderFactory {
     const provider = providerType || process.env.LLM_PROVIDER || 'anthropic';
     
     const providerConfig: LLMProviderConfig = {
-      temperature: parseFloat(process.env.LLM_TEMPERATURE || '0.7'),
-      maxTokens: parseInt(process.env.LLM_MAX_TOKENS || '4096'),
+      temperature: parseFloat(process.env.LLM_TEMPERATURE || '1.0'),
+      maxTokens: parseInt(process.env.LLM_MAX_TOKENS || '512000'),
       timeout: parseInt(process.env.LLM_TIMEOUT || '120000'),
       ...config
     };
