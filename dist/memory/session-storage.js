@@ -37,6 +37,7 @@ exports.SessionStorage = void 0;
 const fs = __importStar(require("fs-extra"));
 const path = __importStar(require("path"));
 const crypto = __importStar(require("crypto"));
+const writeFileAtomic = require('write-file-atomic');
 const path_utils_1 = require("../config/path-utils");
 class SessionStorage {
     sessionsDir;
@@ -51,7 +52,7 @@ class SessionStorage {
         fs.ensureDirSync(path.join(this.sessionsDir, 'active'));
         fs.ensureDirSync(path.join(this.sessionsDir, 'archived'));
         if (!fs.existsSync(this.indexPath)) {
-            fs.writeJsonSync(this.indexPath, { sessions: [] });
+            this.writeJsonAtomicSync(this.indexPath, { sessions: [] });
         }
     }
     async save(session) {
@@ -71,7 +72,7 @@ class SessionStorage {
                 endTime: comp.endTime.toISOString()
             }))
         };
-        await fs.writeJson(sessionPath, serializable, { spaces: 2 });
+        await this.writeJsonAtomic(sessionPath, serializable);
         await this.updateIndex(session);
     }
     async load(sessionId) {
@@ -89,7 +90,7 @@ class SessionStorage {
     }
     async findMostRecent(projectPath) {
         const projectHash = this.hashPath(projectPath);
-        const index = await fs.readJson(this.indexPath);
+        const index = await this.readJsonSafe(this.indexPath);
         const projectSessions = index.sessions
             .filter((s) => s.projectHash === projectHash)
             .sort((a, b) => new Date(b.updated).getTime() - new Date(a.updated).getTime());
@@ -99,7 +100,7 @@ class SessionStorage {
         return this.load(projectSessions[0].id);
     }
     async listSessions(projectPath) {
-        const index = await fs.readJson(this.indexPath);
+        const index = await this.readJsonSafe(this.indexPath);
         if (projectPath) {
             const projectHash = this.hashPath(projectPath);
             return index.sessions.filter((s) => s.projectHash === projectHash);
@@ -117,34 +118,50 @@ class SessionStorage {
         const destPath = path.join(archiveDir, `${sessionId}.json`);
         await fs.move(sourcePath, destPath);
         // Update index
-        const index = await fs.readJson(this.indexPath);
+        const index = await this.readJsonSafe(this.indexPath);
         const sessionIndex = index.sessions.findIndex((s) => s.id === sessionId);
         if (sessionIndex >= 0) {
             index.sessions[sessionIndex].archived = true;
             index.sessions[sessionIndex].archivedDate = date;
-            await fs.writeJson(this.indexPath, index, { spaces: 2 });
+            await this.writeJsonAtomic(this.indexPath, index);
         }
     }
     async updateIndex(session) {
-        const index = await fs.readJson(this.indexPath);
-        const projectHash = this.hashPath(session.projectPath);
-        const existingIndex = index.sessions.findIndex((s) => s.id === session.id);
-        const sessionMeta = {
-            id: session.id,
-            projectPath: session.projectPath,
-            projectHash,
-            created: session.created.toISOString(),
-            updated: new Date().toISOString(),
-            messageCount: session.conversation.length,
-            archived: false
-        };
-        if (existingIndex >= 0) {
-            index.sessions[existingIndex] = sessionMeta;
+        // Retry logic for concurrent access
+        const maxRetries = 3;
+        let retries = 0;
+        while (retries < maxRetries) {
+            try {
+                const index = await this.readJsonSafe(this.indexPath);
+                const projectHash = this.hashPath(session.projectPath);
+                const existingIndex = index.sessions.findIndex((s) => s.id === session.id);
+                const sessionMeta = {
+                    id: session.id,
+                    projectPath: session.projectPath,
+                    projectHash,
+                    created: session.created.toISOString(),
+                    updated: new Date().toISOString(),
+                    messageCount: session.conversation.length,
+                    archived: false
+                };
+                if (existingIndex >= 0) {
+                    index.sessions[existingIndex] = sessionMeta;
+                }
+                else {
+                    index.sessions.push(sessionMeta);
+                }
+                await this.writeJsonAtomic(this.indexPath, index);
+                break; // Success, exit loop
+            }
+            catch (error) {
+                retries++;
+                if (retries >= maxRetries) {
+                    throw new Error(`Failed to update index after ${maxRetries} attempts: ${error}`);
+                }
+                // Wait a bit before retrying
+                await new Promise(resolve => setTimeout(resolve, 100 * retries));
+            }
         }
-        else {
-            index.sessions.push(sessionMeta);
-        }
-        await fs.writeJson(this.indexPath, index, { spaces: 2 });
     }
     hashPath(projectPath) {
         return crypto.createHash('sha256').update(projectPath).digest('hex').substring(0, 12);
@@ -178,6 +195,34 @@ class SessionStorage {
             }
         }
         return null;
+    }
+    async writeJsonAtomic(filepath, data) {
+        const jsonStr = JSON.stringify(data, null, 2);
+        await writeFileAtomic(filepath, jsonStr, 'utf8');
+    }
+    writeJsonAtomicSync(filepath, data) {
+        const jsonStr = JSON.stringify(data, null, 2);
+        writeFileAtomic.sync(filepath, jsonStr, 'utf8');
+    }
+    async readJsonSafe(filepath) {
+        try {
+            const content = await fs.readFile(filepath, 'utf8');
+            return JSON.parse(content);
+        }
+        catch (error) {
+            if (error.code === 'ENOENT') {
+                // File doesn't exist, return empty structure
+                return { sessions: [] };
+            }
+            if (error instanceof SyntaxError) {
+                // JSON is corrupted, try to recover or reset
+                console.error(`Corrupted JSON in ${filepath}, resetting...`);
+                const backup = `${filepath}.backup.${Date.now()}`;
+                await fs.copyFile(filepath, backup).catch(() => { });
+                return { sessions: [] };
+            }
+            throw error;
+        }
     }
 }
 exports.SessionStorage = SessionStorage;

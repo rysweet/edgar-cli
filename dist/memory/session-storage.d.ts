@@ -13,5 +13,8 @@ export declare class SessionStorage {
     private hashPath;
     private deserializeSession;
     private findInArchived;
+    private writeJsonAtomic;
+    private writeJsonAtomicSync;
+    private readJsonSafe;
 }
 //# sourceMappingURL=session-storage.d.ts.map
