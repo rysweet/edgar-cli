@@ -23,6 +23,5 @@ export declare class WebSearchTool extends BaseTool {
     getDefinition(): ToolDefinition;
     execute(parameters: WebSearchToolParameters): Promise<WebSearchToolResult>;
     private performSearch;
-    private getMockResults;
 }
 //# sourceMappingURL=web-search-tool.d.ts.map

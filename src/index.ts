@@ -14,6 +14,7 @@ import { SubagentManager } from './subagents/subagent-manager';
 import { OutputStyleManager } from './output/output-style-manager';
 import { ConfigManager } from './config/config-manager';
 import { ConversationManager } from './memory/conversation-manager';
+import { ClaudeStyleREPL } from './repl/claude-ui';
 import { getConfigDir, ensureDirectoryStructure } from './config/path-utils';
 
 // Check if we're in prompt mode to suppress dotenv output
@@ -130,7 +131,16 @@ async function handleCommand(input: string, masterLoop: any, outputStyleManager:
 }
 
 // Interactive mode function
-async function runInteractiveMode(options: { continue?: boolean } = {}) {
+async function runInteractiveMode(options: { continue?: boolean, minimal?: boolean } = {}) {
+  // Use Claude-style minimal UI if requested
+  if (options.minimal || process.env.EDGAR_MINIMAL_UI === 'true') {
+    const { masterLoop, outputStyleManager } = await initializeEdgar(options);
+    const repl = new ClaudeStyleREPL(masterLoop, outputStyleManager);
+    await repl.start();
+    return;
+  }
+  
+  // Original Edgar UI
   console.log(chalk.cyan(`\n🤖 Edgar v${version} - Claude Code Compatible CLI`));
   console.log(chalk.gray('Type "exit" to quit, "/help" for commands\n'));
   
@@ -232,6 +242,7 @@ program
   .version(version, '-v, --version')
   .option('-p, --prompt <prompt>', 'Execute a single prompt')
   .option('-c, --continue', 'Continue from the previous session')
+  .option('-m, --minimal', 'Use minimal Claude-style interface')
   .option('-d, --debug', 'Enable debug mode')
   .option('--no-color', 'Disable colored output')
   .helpOption('-h, --help', 'Display help for command')
@@ -246,7 +257,7 @@ program
       await executePrompt(options.prompt, { continue: options.continue });
     } else {
       // Default to interactive mode (like Claude Code)
-      await runInteractiveMode({ continue: options.continue });
+      await runInteractiveMode({ continue: options.continue, minimal: options.minimal });
     }
   });
 

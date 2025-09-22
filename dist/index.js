@@ -51,6 +51,7 @@ const subagent_manager_1 = require("./subagents/subagent-manager");
 const output_style_manager_1 = require("./output/output-style-manager");
 const config_manager_1 = require("./config/config-manager");
 const conversation_manager_1 = require("./memory/conversation-manager");
+const claude_ui_1 = require("./repl/claude-ui");
 const path_utils_1 = require("./config/path-utils");
 // Check if we're in prompt mode to suppress dotenv output
 const isPromptMode = process.argv.some(arg => arg === '-p' || arg === '--prompt');
@@ -148,6 +149,14 @@ async function handleCommand(input, masterLoop, outputStyleManager) {
 }
 // Interactive mode function
 async function runInteractiveMode(options = {}) {
+    // Use Claude-style minimal UI if requested
+    if (options.minimal || process.env.EDGAR_MINIMAL_UI === 'true') {
+        const { masterLoop, outputStyleManager } = await initializeEdgar(options);
+        const repl = new claude_ui_1.ClaudeStyleREPL(masterLoop, outputStyleManager);
+        await repl.start();
+        return;
+    }
+    // Original Edgar UI
     console.log(chalk_1.default.cyan(`\n🤖 Edgar v${version} - Claude Code Compatible CLI`));
     console.log(chalk_1.default.gray('Type "exit" to quit, "/help" for commands\n'));
     const spinner = (0, ora_1.default)('Initializing Edgar...').start();
@@ -236,6 +245,7 @@ program
     .version(version, '-v, --version')
     .option('-p, --prompt <prompt>', 'Execute a single prompt')
     .option('-c, --continue', 'Continue from the previous session')
+    .option('-m, --minimal', 'Use minimal Claude-style interface')
     .option('-d, --debug', 'Enable debug mode')
     .option('--no-color', 'Disable colored output')
     .helpOption('-h, --help', 'Display help for command')
@@ -250,7 +260,7 @@ program
     }
     else {
         // Default to interactive mode (like Claude Code)
-        await runInteractiveMode({ continue: options.continue });
+        await runInteractiveMode({ continue: options.continue, minimal: options.minimal });
     }
 });
 // Parse arguments
