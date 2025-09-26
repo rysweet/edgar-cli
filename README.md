@@ -9,17 +9,6 @@ Edgar is a fully Claude Code-compatible CLI implementation, built using Test-Dri
 
 **Repository**: [https://github.com/rysweet/edgar-cli](https://github.com/rysweet/edgar-cli)
 
-## ✅ Project Status: COMPLETE
-
-All major features have been implemented and tested:
-- ✅ Real LLM integration (Azure OpenAI, OpenAI, Anthropic)
-- ✅ Complete tool suite (Read, Write, Edit, Bash, Glob, Grep, TodoWrite, WebFetch, WebSearch, Task)
-- ✅ Full subagent system (21 specialized agents)
-- ✅ Output styles system (concise, detailed, socratic, technical, tutorial)
-- ✅ .edgar/.claude directory support with migration
-- ✅ Working executable with npm link
-- ✅ End-to-end testing verified
-
 ## Installation
 
 ### Quick Start (No Installation)
